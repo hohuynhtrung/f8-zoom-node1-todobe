@@ -1,7 +1,7 @@
 const http = require("node:http");
 const jsonDB = require("./utils/jsonDB");
 
-const allowOrigin = ["http://localhost:5173"];
+const allowOrigin = ["http://localhost:5173", "https://hohuynhtrung.github.io"];
 
 const server = http.createServer((req, res) => {
   const rqOrigin = req.headers.origin;
