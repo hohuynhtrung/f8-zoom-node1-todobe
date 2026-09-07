@@ -32,6 +32,22 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === "GET" && req.url.startsWith("/api/tasks/")) {
+    const id = Number(req.url.split("/").pop());
+    const db = jsonDB.read();
+    const task = db.tasks.find((task) => task.id === id);
+
+    if (!task) {
+      res.writeHead(404, headers);
+      res.end(JSON.stringify({ message: "Task node found" }));
+      return;
+    }
+
+    res.writeHead(200, headers);
+    res.end(JSON.stringify(task));
+    return;
+  }
+
   // [POST] /api/tasks
   if (req.method === "POST" && req.url === "/api/tasks") {
     let body = "";
@@ -147,20 +163,42 @@ const server = http.createServer((req, res) => {
 
   //bypass-cors
   if (req.url.startsWith("/bypass-cors")) {
-    const query = new URLSearchParams(req.url.split("?").pop());
-    const originUrl = query.get("url");
+    const fullUrl = new URL(req.url, `http://${req.headers.host}`);
+    const targetUrl = fullUrl.searchParams.get("url");
 
-    fetch(originUrl, {
-      method: req.method,
-    })
-      .then((response) => {
-        headers["Content-Type"] = response.headers.get("Content-Type");
-        return response.text();
-      })
-      .then((result) => {
-        res.writeHead(200, headers);
-        res.end(result);
-      });
+    if (!targetUrl) {
+      res.writeHead(400, headers);
+      res.end(JSON.stringify({ message: "Missing url" }));
+      return;
+    }
+
+    let body = "";
+
+    req.on("data", (chunk) => {
+      body += chunk.toString();
+    });
+
+    req.on("end", async () => {
+      const fetchOptions = {
+        method: req.method,
+        headers: {
+          "Content-Type": req.headers["content-type"] || "application/json",
+        },
+      };
+
+      if (!["GET", "HEAD"].includes(req.method)) {
+        fetchOptions.body = body;
+      }
+
+      const response = await fetch(targetUrl, fetchOptions);
+      const result = await response.text();
+
+      headers["Content-Type"] =
+        response.headers.get("content-type") || "application/json";
+
+      res.writeHead(response.status, headers);
+      res.end(result);
+    });
 
     return;
   }
